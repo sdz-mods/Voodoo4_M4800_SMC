@@ -1,0 +1,12 @@
+Debug/
+Release/
+
+*.obj
+*.d
+*.out
+*.map
+*_linkInfo.xml
+ccsObjs.opt
+*.log
+
+.clangd/.cache/
