@@ -4,6 +4,9 @@
 #include <stdint.h>
 
 #define HOST_TX_BYTES 5
+#define HOST_CMD_PREFIX 0x7f
+#define HOST_CMD_SCALER_FULLSCREEN 0x10
+#define HOST_CMD_SCALER_DOS_ASPECT 0x11
 
 typedef struct {
     uint8_t backlight;

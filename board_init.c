@@ -23,7 +23,8 @@ void board_init_gpio(void)
                                            SCALER_RESET_PIN);
 
     GPIO_setAsInputPinWithPullDownResistor(GPIO_PORT_P2, GPIO_PIN5);
-    GPIO_setAsInputPinWithPullDownResistor(GPIO_PORT_P2, GPIO_PIN6);
+    GPIO_setAsOutputPin(SCALER_DOS_ASPECT_PORT, SCALER_DOS_ASPECT_PIN);
+    GPIO_LOW(SCALER_DOS_ASPECT);
 
     GPIO_setAsInputPinWithPullDownResistor(SCALER_BACKLIGHT_PORT,
                                            SCALER_BACKLIGHT_PIN);

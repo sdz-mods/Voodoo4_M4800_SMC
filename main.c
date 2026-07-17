@@ -65,16 +65,24 @@ void main(void)
         host_protocol_poll_timeout();
 
         if (host_protocol_take_request(&request)) {
-            SYSCFG0 = FRWPPW | DFWP;
-            settings_decode_host(request.backlight, request.settings);
-            pwm_set_backlight_percent(backlight_percent);
-            SYSCFG0 = FRWPPW | PFWP | DFWP;
-            card_apply_vsa_blank_fix();
-            card_apply_vcore();
+            if (request.backlight == HOST_CMD_PREFIX) {
+                if (request.settings == HOST_CMD_SCALER_DOS_ASPECT)
+                    GPIO_HIGH(SCALER_DOS_ASPECT);
+                else if (request.settings == HOST_CMD_SCALER_FULLSCREEN)
+                    GPIO_LOW(SCALER_DOS_ASPECT);
+            } else {
+                SYSCFG0 = FRWPPW | DFWP;
+                settings_decode_host(request.backlight, request.settings);
+                pwm_set_backlight_percent(backlight_percent);
+                SYSCFG0 = FRWPPW | PFWP | DFWP;
+                card_apply_vsa_blank_fix();
+                card_apply_vcore();
+            }
         }
 
         /* Apply reset-safe settings again during external PCI reset. */
         if (GPIO_READ(PCI_RESET) == 0) {
+            GPIO_LOW(SCALER_DOS_ASPECT);
             card_apply_framebuffer_straps();
             card_apply_vsa_blank_fix();
         }
