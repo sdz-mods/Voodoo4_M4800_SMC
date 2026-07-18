@@ -11,6 +11,7 @@
 #include "monitor.h"
 #include "power.h"
 #include "pwm.h"
+#include "scaler_uart.h"
 #include "settings.h"
 
 static void delay_legacy_units(uint16_t units)
@@ -35,6 +36,7 @@ void main(void)
     host_protocol_init();
 
     hardware_init_clocks_timers_adc();
+    scaler_uart_init();
     SYSCFG0 = FRWPPW | DFWP;
     settings_sanitize();
     pwm_set_backlight_percent(backlight_percent);
@@ -61,30 +63,45 @@ void main(void)
     delay_legacy_units(PRE_BRIDGE_DELAY_LEGACY_UNITS);
     display_bridge_init();
 
+    /* sync the scaler to our stored settings now that it has booted */
+    scaler_uart_push_all();
+
     while (1) {
         host_protocol_poll_timeout();
 
         if (host_protocol_take_request(&request)) {
-            if (request.backlight == HOST_CMD_PREFIX) {
-                if (request.settings == HOST_CMD_SCALER_DOS_ASPECT)
-                    GPIO_HIGH(SCALER_DOS_ASPECT);
-                else if (request.settings == HOST_CMD_SCALER_FULLSCREEN)
-                    GPIO_LOW(SCALER_DOS_ASPECT);
+            if (request.reg == HOST_CMD_PREFIX) {
+                /* side-band command, not a register store */
+                if (request.value == HOST_CMD_SCALER_DOS_ASPECT)
+                    scaler_uart_set_dos_override(0);  /* restore stored dos43 */
+                else if (request.value == HOST_CMD_SCALER_FULLSCREEN)
+                    scaler_uart_set_dos_override(1);  /* force DOS stretch */
             } else {
-                SYSCFG0 = FRWPPW | DFWP;
-                settings_decode_host(request.backlight, request.settings);
-                pwm_set_backlight_percent(backlight_percent);
-                SYSCFG0 = FRWPPW | PFWP | DFWP;
-                card_apply_vsa_blank_fix();
-                card_apply_vcore();
+                reg_domain_t domain;
+
+                SYSCFG0 = FRWPPW | DFWP;            /* unlock data FRAM */
+                domain = settings_write_register(request.reg, request.value);
+                SYSCFG0 = FRWPPW | PFWP | DFWP;     /* relock */
+
+                if (domain == REG_DOMAIN_POWER) {
+                    pwm_set_backlight_percent(backlight_percent);
+                    card_apply_vsa_blank_fix();
+                    card_apply_vcore();
+                } else if (domain == REG_DOMAIN_SCALER) {
+                    scaler_uart_send_register(request.reg);
+                }
             }
+
+            /* reflect the write in the read block immediately */
+            monitor_update_host_response();
         }
 
         /* Apply reset-safe settings again during external PCI reset. */
         if (GPIO_READ(PCI_RESET) == 0) {
-            GPIO_LOW(SCALER_DOS_ASPECT);
             card_apply_framebuffer_straps();
             card_apply_vsa_blank_fix();
+            /* a reboot re-enters SeaBIOS: force DOS stretch again (deduped) */
+            scaler_uart_set_dos_override(1);
         }
 
         if (monitor_is_due() && host_protocol_is_idle())

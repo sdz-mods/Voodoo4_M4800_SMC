@@ -3,14 +3,22 @@
 
 #include <stdint.h>
 
-#define HOST_TX_BYTES 5
-#define HOST_CMD_PREFIX 0x7f
-#define HOST_CMD_SCALER_FULLSCREEN 0x10
-#define HOST_CMD_SCALER_DOS_ASPECT 0x11
+/* Read block: fixed, versioned. See monitor_update_host_response(). */
+#define HOST_TX_BYTES 20
+#define HOST_PROTO_VERSION 2
+
+/*
+ * Reserved "command" writes. A host write of [reg, value] with reg == 0x7f is
+ * not a register store but a side-band command (value = sub-command). Used by
+ * SeaBIOS to toggle the DOS-aspect boot override at OS handoff.
+ */
+#define HOST_CMD_PREFIX             0x7f
+#define HOST_CMD_SCALER_FULLSCREEN  0x10  /* force DOS stretch (boot default) */
+#define HOST_CMD_SCALER_DOS_ASPECT  0x11  /* restore stored dos43 (e.g. 4:3)  */
 
 typedef struct {
-    uint8_t backlight;
-    uint8_t settings;
+    uint8_t reg;    /* XIO register index (settings.h REG_*) */
+    uint8_t value;  /* value to write */
 } host_request_t;
 
 void host_protocol_init(void);

@@ -60,8 +60,8 @@ uint8_t host_protocol_take_request(host_request_t *request)
         return 0;
 
     P4IE &= ~BIT1;
-    request->backlight = rx_data[0];
-    request->settings = rx_data[1];
+    request->reg = rx_data[0];
+    request->value = rx_data[1];
     rx_data[0] = 0;
     rx_data[1] = 0;
     rx_packet_ready = 0;

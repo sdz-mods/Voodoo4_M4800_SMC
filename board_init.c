@@ -22,9 +22,13 @@ void board_init_gpio(void)
     GPIO_setAsInputPinWithPullDownResistor(SCALER_RESET_PORT,
                                            SCALER_RESET_PIN);
 
-    GPIO_setAsInputPinWithPullDownResistor(GPIO_PORT_P2, GPIO_PIN5);
-    GPIO_setAsOutputPin(SCALER_DOS_ASPECT_PORT, SCALER_DOS_ASPECT_PIN);
-    GPIO_LOW(SCALER_DOS_ASPECT);
+    /*
+     * P2.5 (UCA1RXD) and P2.6 (UCA1TXD) are the scaler UART link; their pin
+     * function is selected in scaler_uart_init(). Park them as inputs until
+     * then (external pull-ups hold both lines high) so nothing drives against
+     * the scaler's open-drain TXD during early boot.
+     */
+    GPIO_setAsInputPin(GPIO_PORT_P2, GPIO_PIN5 | GPIO_PIN6);
 
     GPIO_setAsInputPinWithPullDownResistor(SCALER_BACKLIGHT_PORT,
                                            SCALER_BACKLIGHT_PIN);

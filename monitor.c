@@ -7,6 +7,7 @@
 #include "monitor.h"
 #include "power.h"
 #include "pwm.h"
+#include "scaler_uart.h"
 #include "settings.h"
 #include "thermal.h"
 
@@ -32,12 +33,32 @@ static void fault_latch(enum fault_reason reason)
 void monitor_update_host_response(void)
 {
     uint8_t response[HOST_TX_BYTES];
+    const scaler_status_t *s = scaler_uart_status();
 
-    response[0] = backlight_percent;
-    response[1] = settings_encode_host();
-    response[2] = external_temp_c;
-    response[3] = internal_temp_c;
-    response[4] = pwm_get_fan_duty() * 10;
+    /*
+     * Live data first so a short "status" read (MXM_STATUS_BYTES) gets the
+     * scaler link/lock/resolution quickly; settings follow.
+     */
+    response[0]  = HOST_PROTO_VERSION;
+    response[1]  = (s->link_ok ? 0x01 : 0x00) | (s->lock ? 0x02 : 0x00);
+    response[2]  = (uint8_t)(s->in_width & 0xFF);
+    response[3]  = (uint8_t)(s->in_width >> 8);
+    response[4]  = (uint8_t)(s->in_height & 0xFF);
+    response[5]  = (uint8_t)(s->in_height >> 8);
+    response[6]  = external_temp_c;
+    response[7]  = internal_temp_c;
+    response[8]  = pwm_get_fan_duty() * 10;
+    response[9]  = backlight_percent;
+    response[10] = vcore_setting;
+    response[11] = fbsize_setting;
+    response[12] = vsa_blank_fix_en;
+    response[13] = scaler_dos43;
+    response[14] = scaler_sharpness;
+    response[15] = scaler_contrast;
+    response[16] = scaler_peaking;
+    response[17] = scaler_rgb_r;
+    response[18] = scaler_rgb_g;
+    response[19] = scaler_rgb_b;
     host_protocol_set_response(response);
 }
 
@@ -68,6 +89,9 @@ void monitor_run(void)
         fault_latch(FAULT_EXTERNAL_OVERTEMP);
     if (internal_temp_c > OVERTEMP_SHUTDOWN_C)
         fault_latch(FAULT_INTERNAL_OVERTEMP);
+
+    /* refresh cached scaler live status (reply parsed async in the RX ISR) */
+    scaler_uart_request_status();
 
     monitor_due = 0;
     monitor_update_host_response();

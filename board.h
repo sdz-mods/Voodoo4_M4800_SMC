@@ -29,8 +29,13 @@
 #define SCALER_RESET_PIN GPIO_PIN4
 #define SCALER_BACKLIGHT_PORT GPIO_PORT_P4
 #define SCALER_BACKLIGHT_PIN GPIO_PIN2
-#define SCALER_DOS_ASPECT_PORT GPIO_PORT_P2
-#define SCALER_DOS_ASPECT_PIN GPIO_PIN6
+
+/*
+ * Scaler command link: eUSCI_A1 UART, 19200 8N1 (see scaler_uart.c).
+ *   P2.6 = UCA1TXD -> scaler pin 58 (RXD)   [was the old SCALER_DOS_ASPECT GPIO]
+ *   P2.5 = UCA1RXD <- scaler pin 59 (TXD)
+ * DOS-aspect is now the dos43 register over UART, not a GPIO level.
+ */
 
 #define MXM_POWER_GOOD_PORT GPIO_PORT_P2
 #define MXM_POWER_GOOD_PIN GPIO_PIN2
