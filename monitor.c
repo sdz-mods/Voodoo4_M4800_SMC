@@ -59,6 +59,14 @@ void monitor_update_host_response(void)
     response[17] = scaler_rgb_r;
     response[18] = scaler_rgb_g;
     response[19] = scaler_rgb_b;
+    response[20] = scaler_filter_family;
+    {
+        uint8_t f;
+        for (f = 0; f < FIR_FAM_COUNT; f++) {
+            response[21 + f] = (uint8_t)scaler_filter_p1[f];
+            response[21 + FIR_FAM_COUNT + f] = (uint8_t)scaler_filter_p2[f];
+        }
+    }
     host_protocol_set_response(response);
 }
 

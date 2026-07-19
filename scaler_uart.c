@@ -3,6 +3,7 @@
 
 #include "scaler_uart.h"
 #include "settings.h"
+#include "fir_gen.h"
 
 /*
  * Baud for SMCLK = 16 MHz, 19200 8N1, oversampling (UCOS16=1):
@@ -128,6 +129,39 @@ void scaler_uart_send_rgbgain(uint8_t r, uint8_t g, uint8_t b)
     scu_send_frame(SCU_CMD_SET_RGBGAIN, p, 3);
 }
 
+/* set when a filter reg changed; the ~67 ms FIR push is deferred to the main
+ * loop so a burst of filter writes does not stall the host protocol. */
+static volatile uint8_t g_filter_dirty = 0;
+
+void scaler_uart_apply_filter(void)
+{
+    uint8_t fir[128];
+    uint8_t fam = (uint8_t)scaler_filter_family;
+
+    fir_generate(fam,
+                 (uint8_t)scaler_filter_p1[fam],
+                 (uint8_t)scaler_filter_p2[fam], fir);
+    scu_send_frame(SCU_CMD_LOAD_FIR, fir, sizeof(fir));
+}
+
+void scaler_uart_mark_filter_dirty(void)
+{
+    g_filter_dirty = 1;
+}
+
+uint8_t scaler_uart_filter_pending(void)
+{
+    return g_filter_dirty;
+}
+
+void scaler_uart_flush_filter(void)
+{
+    if (!g_filter_dirty)
+        return;
+    g_filter_dirty = 0;
+    scaler_uart_apply_filter();
+}
+
 void scaler_uart_send_register(uint8_t index)
 {
     switch (index) {
@@ -159,12 +193,17 @@ void scaler_uart_send_register(uint8_t index)
 void scaler_uart_push_all(void)
 {
     scu_apply_dos43();
-    scaler_uart_send_sharpness((uint8_t)scaler_sharpness);
     scaler_uart_send_contrast((uint8_t)scaler_contrast);
     scaler_uart_send_peaking((uint8_t)scaler_peaking);
     scaler_uart_send_rgbgain((uint8_t)scaler_rgb_r,
                              (uint8_t)scaler_rgb_g,
                              (uint8_t)scaler_rgb_b);
+    /*
+     * FIR last: SET_SHARPNESS is intentionally not sent here because on the RTD
+     * it loads a table into the SAME registers as LOAD_FIR and would clobber our
+     * generated filter.
+     */
+    scaler_uart_apply_filter();
 }
 
 void scaler_uart_request_status(void)

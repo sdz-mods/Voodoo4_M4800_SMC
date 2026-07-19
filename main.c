@@ -27,9 +27,14 @@ static void delay_ms(uint16_t ms)
         __delay_cycles(16000);
 }
 
+/* main-loop iterations (~1 ms each) the host must be quiet before the deferred
+ * scale-up FIR is pushed to the scaler. Longer than any inter-write gap. */
+#define FILTER_FLUSH_QUIET_MS 50
+
 void main(void)
 {
     host_request_t request;
+    uint16_t filter_quiet = 0;
 
     WDTCTL = WDTPW | WDTHOLD;
     board_init_gpio();
@@ -70,6 +75,7 @@ void main(void)
         host_protocol_poll_timeout();
 
         if (host_protocol_take_request(&request)) {
+            filter_quiet = 0;      /* host active: defer the FIR flush */
             if (request.reg == HOST_CMD_PREFIX) {
                 /* side-band command, not a register store */
                 if (request.value == HOST_CMD_SCALER_DOS_ASPECT)
@@ -89,11 +95,30 @@ void main(void)
                     card_apply_vcore();
                 } else if (domain == REG_DOMAIN_SCALER) {
                     scaler_uart_send_register(request.reg);
+                } else if (domain == REG_DOMAIN_FILTER) {
+                    /* defer the ~67 ms FIR push (flushed once the host goes
+                     * quiet, below) so an Apply burst stays responsive */
+                    scaler_uart_mark_filter_dirty();
                 }
             }
 
             /* reflect the write in the read block immediately */
             monitor_update_host_response();
+        } else if (scaler_uart_filter_pending() && host_protocol_is_idle()) {
+            /*
+             * Coalesced FIR flush: only push once the host has been quiet for
+             * ~FILTER_FLUSH_QUIET_MS, so the many filter writes of a single
+             * Apply collapse into ONE 67 ms transfer instead of one per write.
+             */
+            if (++filter_quiet >= FILTER_FLUSH_QUIET_MS) {
+                filter_quiet = 0;
+                scaler_uart_flush_filter();
+                monitor_update_host_response();
+            } else {
+                delay_ms(1);
+            }
+        } else {
+            filter_quiet = 0;      /* a transfer is in progress: keep waiting */
         }
 
         /* Apply reset-safe settings again during external PCI reset. */

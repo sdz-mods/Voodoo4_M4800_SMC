@@ -9,6 +9,10 @@
 
 #define ENABLE_SCALER_BACKLIGHT_GATE 1
 #define FAN_STARTUP_DELAY_TICKS 131070UL
+/* backlight PWM prescale: run it every Nth Timer0 ISR so its 10% on-pulse is
+ * N ISR periods (~240 us at 32) instead of one (~7.5 us), immune to jitter.
+ * The fan keeps the full ISR rate. */
+#define BACKLIGHT_PWM_PRESCALE 32
 
 #define TMP103_VARIANT_A 0
 #define TMP103_VARIANT_B 1

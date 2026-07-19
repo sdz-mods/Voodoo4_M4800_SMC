@@ -3,8 +3,9 @@
 
 #include <stdint.h>
 
-/* Read block: fixed, versioned. See monitor_update_host_response(). */
-#define HOST_TX_BYTES 20
+/* Read block: fixed, versioned. See monitor_update_host_response().
+ * 23 base bytes + per-family filter params (family + p1[4] + p2[4] = 9). */
+#define HOST_TX_BYTES 29
 #define HOST_PROTO_VERSION 2
 
 /*

@@ -56,17 +56,27 @@ uint8_t host_protocol_is_idle(void)
 
 uint8_t host_protocol_take_request(host_request_t *request)
 {
+    uint16_t status;
+
     if (!rx_packet_ready)
         return 0;
 
-    P4IE &= ~BIT1;
+    /*
+     * Read the buffer atomically by masking the GLOBAL interrupt, not by
+     * disabling P4 and clearing P4IFG. Clearing P4IFG here would discard a host
+     * clock edge that arrives mid-read, dropping a bit and desyncing the rest of
+     * the transfer (wrong register/value written). A coincident edge instead
+     * stays latched in P4IFG and is serviced the moment interrupts re-enable.
+     */
+    status = __get_SR_register();
+    __disable_interrupt();
     request->reg = rx_data[0];
     request->value = rx_data[1];
     rx_data[0] = 0;
     rx_data[1] = 0;
     rx_packet_ready = 0;
-    P4IFG &= ~BIT1;
-    P4IE |= BIT1;
+    if (status & GIE)
+        __enable_interrupt();
     return 1;
 }
 

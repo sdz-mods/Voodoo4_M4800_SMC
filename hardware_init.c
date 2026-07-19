@@ -4,6 +4,13 @@
 #include "firmware_config.h"
 #include "hardware_init.h"
 
+/*
+ * Timer0 ISR (~133 kHz) drives the 10-step software PWM. The FAN uses it every
+ * ISR -> ~13 kHz fan PWM (it stalls at low PWM frequencies). The BACKLIGHT is
+ * prescaled inside the ISR (see pwm.c) to ~0.4 kHz so its low-duty on-pulses
+ * are long (~240 us) and immune to ISR jitter, which otherwise stretched the
+ * one-ISR-period 10% pulse and made a dim panel flicker brighter.
+ */
 #define TIMER0_PWM_PERIOD_COUNTS 120
 #define TIMER1_MONITOR_PERIOD_COUNTS 32768
 

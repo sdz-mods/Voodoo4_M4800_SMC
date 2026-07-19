@@ -19,6 +19,7 @@
 #define SCU_CMD_SET_CONTRAST    0x03
 #define SCU_CMD_SET_PEAKING     0x04
 #define SCU_CMD_SET_RGBGAIN     0x05
+#define SCU_CMD_LOAD_FIR        0x06   /* 128-byte scale-up FIR table */
 #define SCU_CMD_GET_STATUS      0x10
 #define SCU_RSP_ACK             0x81
 #define SCU_RSP_STATUS          0x90
@@ -50,6 +51,21 @@ void scaler_uart_send_sharpness(uint8_t v);
 void scaler_uart_send_contrast(uint8_t v);
 void scaler_uart_send_peaking(uint8_t v);
 void scaler_uart_send_rgbgain(uint8_t r, uint8_t g, uint8_t b);
+
+/*
+ * Regenerate the scale-up FIR from the stored filter params (family/p1/p2) and
+ * push it as a 128-byte LOAD_FIR frame. This is the "sharpness" the panel
+ * actually reacts to; the legacy SET_SHARPNESS table select is not used.
+ *
+ * The push is ~67 ms (128 bytes @ 19200). To avoid blocking the host protocol
+ * once per write during an Apply burst, filter register writes only flag it
+ * dirty (scaler_uart_mark_filter_dirty); the main loop flushes it ONCE, from
+ * scaler_uart_flush_filter(), after the host has gone quiet.
+ */
+void scaler_uart_apply_filter(void);
+void scaler_uart_mark_filter_dirty(void);
+uint8_t scaler_uart_filter_pending(void);
+void scaler_uart_flush_filter(void);
 
 /* send the scaler setting identified by an XIO register index (SCU_REG_*) */
 void scaler_uart_send_register(uint8_t index);
